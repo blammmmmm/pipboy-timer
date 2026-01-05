@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pip-Boy Timer Controller</title>
+  <style>
+    :root{ --g:#33ff66; --bg:#050b07; }
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--g);font-family:ui-monospace,Menlo,Consolas,monospace;}
+    .wrap{height:100%;display:grid;place-items:center;padding:20px;}
+    .card{width:min(520px,92vw);border:2px solid rgba(51,255,102,.35);border-radius:14px;padding:18px 16px;
+      background:linear-gradient(180deg, rgba(51,255,102,.06), rgba(0,0,0,.35));
+      box-shadow:0 18px 60px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.6);
+    }
+    .title{letter-spacing:2px;text-transform:uppercase;font-size:14px;opacity:.9;margin-bottom:10px}
+    .big{font-size:32px;letter-spacing:.12em;text-align:center;margin:10px 0 14px;text-shadow:0 0 18px rgba(51,255,102,.25);}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    button{
+      appearance:none;border:2px solid rgba(51,255,102,.45);background:rgba(0,0,0,.45);color:var(--g);
+      padding:14px 12px;border-radius:12px;font-size:16px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;
+    }
+    button:active{transform:translateY(1px)}
+    button:hover{border-color:rgba(51,255,102,.75)}
+    .full{grid-column:1/-1}
+    .hint{margin-top:10px;font-size:12px;opacity:.75;line-height:1.35}
+    input{
+      width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(51,255,102,.25);
+      background:rgba(0,0,0,.35);color:var(--g);outline:none;
+    }
+    .mini{display:grid;gap:8px;margin-top:10px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="title">Timer Controller</div>
+      <div class="big" id="preview">00:00:00:00</div>
+
+      <div class="row">
+        <button id="start" class="full">Start / Restart</button>
+        <button id="stop">Stop</button>
+        <button id="resume">Resume</button>
+        <button id="reset" class="full">Reset to 00</button>
+      </div>
+
+      <div class="mini">
+        <div class="hint">
+          This controller must use the same <b>db</b> and <b>room</b> params as the OBS overlay link.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const qs = new URLSearchParams(location.search);
+    const db = qs.get("db");
+    const room = qs.get("room");
+    if (!db || !room) alert("Missing ?db=...&room=... in the URL.");
+
+    const endpoint = (db && room) ? `${db.replace(/\/+$/,"")}/pipboyTimers/${encodeURIComponent(room)}.json` : null;
+
+    const preview = document.getElementById("preview");
+    function pad2(n){ return String(n).padStart(2,"0"); }
+    function formatElapsed(ms){
+      const totalSec = Math.max(0, Math.floor(ms/1000));
+      const days = Math.floor(totalSec/86400);
+      const rem1 = totalSec - days*86400;
+      const hours = Math.floor(rem1/3600);
+      const rem2 = rem1 - hours*3600;
+      const mins = Math.floor(rem2/60);
+      const secs = rem2 - mins*60;
+      return `${pad2(days)}:${pad2(hours)}:${pad2(mins)}:${pad2(secs)}`;
+    }
+
+    async function getState(){
+      if (!endpoint) return { startEpoch:null, stoppedAt:null };
+      const res = await fetch(endpoint, { cache:"no-store" });
+      const data = await res.json();
+      return (data && typeof data === "object") ? data : { startEpoch:null, stoppedAt:null };
+    }
+
+    async function patchState(patch){
+      if (!endpoint) return;
+      await fetch(endpoint, {
+        method:"PATCH",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(patch)
+      });
+    }
+
+    document.getElementById("start").onclick = async () => {
+      await patchState({ startEpoch: Date.now(), stoppedAt: null });
+    };
+
+    document.getElementById("reset").onclick = async () => {
+      await patchState({ startEpoch: Date.now(), stoppedAt: null });
+    };
+
+    document.getElementById("stop").onclick = async () => {
+      const s = await getState();
+      if (!s.startEpoch) return;
+      if (s.stoppedAt) return;
+      await patchState({ stoppedAt: Date.now() });
+    };
+
+    document.getElementById("resume").onclick = async () => {
+      const s = await getState();
+      if (!s.startEpoch || !s.stoppedAt) return;
+      const paused = Date.now() - s.stoppedAt;
+      await patchState({ startEpoch: s.startEpoch + paused, stoppedAt: null });
+    };
+
+    // preview display
+    setInterval(async () => {
+      try{
+        const s = await getState();
+        if (!s.startEpoch) preview.textContent = "00:00:00:00";
+        else {
+          const end = s.stoppedAt ?? Date.now();
+          preview.textContent = formatElapsed(end - s.startEpoch);
+        }
+      }catch{}
+    }, 750);
+  </script>
+</body>
+</html>
