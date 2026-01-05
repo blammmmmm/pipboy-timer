@@ -6,94 +6,45 @@
   <title>Pip-Boy Timer Controller</title>
 
   <style>
-    :root {
-      --g: #33ff66;
-      --bg: #050b07;
+    :root { --g:#33ff66; --bg:#050b07; }
+    html,body{
+      height:100%; margin:0;
+      background:var(--bg); color:var(--g);
+      font-family:ui-monospace, Menlo, Consolas, monospace;
     }
-
-    html, body {
-      height: 100%;
-      margin: 0;
-      background: var(--bg);
-      color: var(--g);
-      font-family: ui-monospace, Menlo, Consolas, monospace;
+    .wrap{height:100%; display:grid; place-items:center; padding:20px;}
+    .card{
+      width:min(560px,92vw);
+      border:2px solid rgba(51,255,102,.35);
+      border-radius:14px;
+      padding:18px 16px;
+      background:linear-gradient(180deg, rgba(51,255,102,.06), rgba(0,0,0,.35));
+      box-shadow:0 18px 60px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.6);
+      display:grid; gap:12px;
     }
-
-    .wrap {
-      height: 100%;
-      display: grid;
-      place-items: center;
-      padding: 20px;
+    .title{letter-spacing:2px; text-transform:uppercase; font-size:14px; opacity:.9;}
+    .big{
+      font-size:34px; letter-spacing:.12em; text-align:center;
+      margin:6px 0 2px;
+      text-shadow:0 0 18px rgba(51,255,102,.25);
     }
-
-    .card {
-      width: min(560px, 92vw);
-      border: 2px solid rgba(51,255,102,.35);
-      border-radius: 14px;
-      padding: 18px 16px;
-      background: linear-gradient(
-        180deg,
-        rgba(51,255,102,.06),
-        rgba(0,0,0,.35)
-      );
-      box-shadow:
-        0 18px 60px rgba(0,0,0,.55),
-        inset 0 0 0 1px rgba(0,0,0,.6);
-      display: grid;
-      gap: 12px;
+    .row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+    button{
+      appearance:none;
+      border:2px solid rgba(51,255,102,.45);
+      background:rgba(0,0,0,.45);
+      color:var(--g);
+      padding:14px 12px;
+      border-radius:12px;
+      font-size:16px;
+      letter-spacing:1px;
+      text-transform:uppercase;
+      cursor:pointer;
     }
-
-    .title {
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      font-size: 14px;
-      opacity: .9;
-    }
-
-    .big {
-      font-size: 34px;
-      letter-spacing: .12em;
-      text-align: center;
-      margin: 6px 0 2px;
-      text-shadow: 0 0 18px rgba(51,255,102,.25);
-    }
-
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    button {
-      appearance: none;
-      border: 2px solid rgba(51,255,102,.45);
-      background: rgba(0,0,0,.45);
-      color: var(--g);
-      padding: 14px 12px;
-      border-radius: 12px;
-      font-size: 16px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      cursor: pointer;
-    }
-
-    button:hover {
-      border-color: rgba(51,255,102,.75);
-    }
-
-    button:active {
-      transform: translateY(1px);
-    }
-
-    .full {
-      grid-column: 1 / -1;
-    }
-
-    .hint {
-      font-size: 12px;
-      opacity: .75;
-      line-height: 1.35;
-    }
+    button:hover{border-color:rgba(51,255,102,.75)}
+    button:active{transform:translateY(1px)}
+    .full{grid-column:1/-1}
+    .hint{font-size:12px; opacity:.75; line-height:1.35}
   </style>
 </head>
 
@@ -104,7 +55,7 @@
       <div class="big" id="preview">00:00:00:00</div>
 
       <div class="row">
-        <button id="start" class="full">Start / Restart</button>
+        <button id="start" class="full">Start / Resume / Restart</button>
         <button id="stop">Stop</button>
         <button id="resume">Resume</button>
         <button id="reset" class="full">Reset to 00</button>
@@ -123,8 +74,7 @@
     const preview = document.getElementById("preview");
 
     if (!db || !room) {
-      hint.textContent =
-        "Missing URL params. Use ?db=https://...firebaseio.com&room=main";
+      hint.textContent = "Missing URL params. Use ?db=https://...firebaseio.com&room=main";
     } else {
       hint.textContent = `Connected • room=${room}`;
     }
@@ -133,75 +83,89 @@
       ? `${db.replace(/\/+$/,"")}/pipboyTimers/${encodeURIComponent(room)}.json`
       : null;
 
-    function pad2(n) {
-      return String(n).padStart(2, "0");
-    }
-
-    function formatElapsed(ms) {
-      const totalSec = Math.max(0, Math.floor(ms / 1000));
-      const days = Math.floor(totalSec / 86400);
-      const rem1 = totalSec - days * 86400;
-      const hours = Math.floor(rem1 / 3600);
-      const rem2 = rem1 - hours * 3600;
-      const mins = Math.floor(rem2 / 60);
-      const secs = rem2 - mins * 60;
+    function pad2(n){ return String(n).padStart(2,"0"); }
+    function formatElapsed(ms){
+      const totalSec = Math.max(0, Math.floor(ms/1000));
+      const days = Math.floor(totalSec/86400);
+      const rem1 = totalSec - days*86400;
+      const hours = Math.floor(rem1/3600);
+      const rem2 = rem1 - hours*3600;
+      const mins = Math.floor(rem2/60);
+      const secs = rem2 - mins*60;
       return `${pad2(days)}:${pad2(hours)}:${pad2(mins)}:${pad2(secs)}`;
     }
 
-    async function patchState(patch) {
+    async function patchState(patch){
       if (!endpoint) return;
       const res = await fetch(endpoint, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        method:"PATCH",
+        headers:{ "Content-Type":"application/json" },
         body: JSON.stringify(patch)
       });
       if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        hint.textContent =
-          `WRITE FAILED (${res.status}) ${txt}`.slice(0, 160);
+        const txt = await res.text().catch(()=> "");
+        hint.textContent = `WRITE FAILED (${res.status}) ${txt}`.slice(0,160);
         throw new Error("Firebase write failed");
       }
     }
 
-    async function getState() {
-      if (!endpoint) return { startEpoch: null, stoppedAt: null };
-      const res = await fetch(endpoint, { cache: "no-store" });
+    async function getState(){
+      if (!endpoint) return { startEpoch:null, stoppedAt:null };
+      const res = await fetch(endpoint, { cache:"no-store" });
       const data = await res.json();
       return (data && typeof data === "object")
         ? data
-        : { startEpoch: null, stoppedAt: null };
+        : { startEpoch:null, stoppedAt:null };
     }
 
-    // BUTTONS
+    // SMART START BUTTON:
+    // - never started -> start
+    // - stopped -> resume from stopped time
+    // - running -> restart from 00
     document.getElementById("start").onclick = async () => {
+      const s = await getState();
+
+      // Never started -> start fresh
+      if (!s.startEpoch) {
+        await patchState({ startEpoch: Date.now(), stoppedAt: null });
+        return;
+      }
+
+      // Stopped -> resume (continue from stopped time)
+      if (s.stoppedAt) {
+        const paused = Date.now() - s.stoppedAt;
+        await patchState({ startEpoch: s.startEpoch + paused, stoppedAt: null });
+        return;
+      }
+
+      // Running -> restart
       await patchState({ startEpoch: Date.now(), stoppedAt: null });
     };
 
-    document.getElementById("reset").onclick = async () => {
-      await patchState({ startEpoch: Date.now(), stoppedAt: null });
-    };
-
+    // Stop always writes stoppedAt
     document.getElementById("stop").onclick = async () => {
       await patchState({ stoppedAt: Date.now() });
     };
 
+    // Resume button (only resumes if currently stopped)
     document.getElementById("resume").onclick = async () => {
       const s = await getState();
       if (!s.startEpoch || !s.stoppedAt) return;
       const paused = Date.now() - s.stoppedAt;
-      await patchState({
-        startEpoch: s.startEpoch + paused,
-        stoppedAt: null
-      });
+      await patchState({ startEpoch: s.startEpoch + paused, stoppedAt: null });
     };
 
-    // LIVE PREVIEW
+    // Reset always resets to 00 and runs
+    document.getElementById("reset").onclick = async () => {
+      await patchState({ startEpoch: Date.now(), stoppedAt: null });
+    };
+
+    // Live preview
     setInterval(async () => {
-      try {
+      try{
         const s = await getState();
-        if (!s.startEpoch) {
-          preview.textContent = "00:00:00:00";
-        } else {
+        if (!s.startEpoch) preview.textContent = "00:00:00:00";
+        else {
           const end = s.stoppedAt ?? Date.now();
           preview.textContent = formatElapsed(end - s.startEpoch);
         }
