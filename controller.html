@@ -14,27 +14,34 @@
     }
     .wrap{height:100%; display:grid; place-items:center; padding:20px;}
     .card{
-      width:min(560px,92vw);
+      width:min(520px,92vw);
       border:2px solid rgba(51,255,102,.35);
       border-radius:14px;
       padding:18px 16px;
       background:linear-gradient(180deg, rgba(51,255,102,.06), rgba(0,0,0,.35));
       box-shadow:0 18px 60px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.6);
-      display:grid; gap:12px;
+      display:grid; gap:14px;
     }
-    .title{letter-spacing:2px; text-transform:uppercase; font-size:14px; opacity:.9;}
+    .title{
+      letter-spacing:2px;
+      text-transform:uppercase;
+      font-size:14px;
+      opacity:.9;
+      text-align:center;
+    }
     .big{
-      font-size:34px; letter-spacing:.12em; text-align:center;
-      margin:6px 0 2px;
+      font-size:34px;
+      letter-spacing:.12em;
+      text-align:center;
       text-shadow:0 0 18px rgba(51,255,102,.25);
     }
-    .row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+    .row{display:grid; grid-template-columns:1fr; gap:10px;}
     button{
       appearance:none;
       border:2px solid rgba(51,255,102,.45);
       background:rgba(0,0,0,.45);
       color:var(--g);
-      padding:14px 12px;
+      padding:16px 12px;
       border-radius:12px;
       font-size:16px;
       letter-spacing:1px;
@@ -43,8 +50,7 @@
     }
     button:hover{border-color:rgba(51,255,102,.75)}
     button:active{transform:translateY(1px)}
-    .full{grid-column:1/-1}
-    .hint{font-size:12px; opacity:.75; line-height:1.35}
+    .hint{font-size:12px; opacity:.7; text-align:center}
   </style>
 </head>
 
@@ -55,10 +61,9 @@
       <div class="big" id="preview">00:00:00:00</div>
 
       <div class="row">
-        <button id="start" class="full">Start / Resume / Restart</button>
+        <button id="start">Start / Resume</button>
         <button id="stop">Stop</button>
-        <button id="resume">Resume</button>
-        <button id="reset" class="full">Reset to 00</button>
+        <button id="reset">Reset (00)</button>
       </div>
 
       <div class="hint" id="hint"></div>
@@ -74,7 +79,7 @@
     const preview = document.getElementById("preview");
 
     if (!db || !room) {
-      hint.textContent = "Missing URL params. Use ?db=https://...firebaseio.com&room=main";
+      hint.textContent = "Missing URL params (?db=...&room=...)";
     } else {
       hint.textContent = `Connected • room=${room}`;
     }
@@ -95,20 +100,6 @@
       return `${pad2(days)}:${pad2(hours)}:${pad2(mins)}:${pad2(secs)}`;
     }
 
-    async function patchState(patch){
-      if (!endpoint) return;
-      const res = await fetch(endpoint, {
-        method:"PATCH",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify(patch)
-      });
-      if (!res.ok) {
-        const txt = await res.text().catch(()=> "");
-        hint.textContent = `WRITE FAILED (${res.status}) ${txt}`.slice(0,160);
-        throw new Error("Firebase write failed");
-      }
-    }
-
     async function getState(){
       if (!endpoint) return { startEpoch:null, stoppedAt:null };
       const res = await fetch(endpoint, { cache:"no-store" });
@@ -118,44 +109,41 @@
         : { startEpoch:null, stoppedAt:null };
     }
 
-    // SMART START BUTTON:
-    // - never started -> start
-    // - stopped -> resume from stopped time
-    // - running -> restart from 00
+    async function patchState(patch){
+      if (!endpoint) return;
+      await fetch(endpoint, {
+        method:"PATCH",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(patch)
+      });
+    }
+
+    // START / RESUME (safe)
     document.getElementById("start").onclick = async () => {
       const s = await getState();
 
-      // Never started -> start fresh
+      // Never started → start
       if (!s.startEpoch) {
         await patchState({ startEpoch: Date.now(), stoppedAt: null });
         return;
       }
 
-      // Stopped -> resume (continue from stopped time)
+      // Stopped → resume
       if (s.stoppedAt) {
         const paused = Date.now() - s.stoppedAt;
-        await patchState({ startEpoch: s.startEpoch + paused, stoppedAt: null });
-        return;
+        await patchState({
+          startEpoch: s.startEpoch + paused,
+          stoppedAt: null
+        });
       }
-
-      // Running -> restart
-      await patchState({ startEpoch: Date.now(), stoppedAt: null });
     };
 
-    // Stop always writes stoppedAt
+    // STOP
     document.getElementById("stop").onclick = async () => {
       await patchState({ stoppedAt: Date.now() });
     };
 
-    // Resume button (only resumes if currently stopped)
-    document.getElementById("resume").onclick = async () => {
-      const s = await getState();
-      if (!s.startEpoch || !s.stoppedAt) return;
-      const paused = Date.now() - s.stoppedAt;
-      await patchState({ startEpoch: s.startEpoch + paused, stoppedAt: null });
-    };
-
-    // Reset always resets to 00 and runs
+    // RESET
     document.getElementById("reset").onclick = async () => {
       await patchState({ startEpoch: Date.now(), stoppedAt: null });
     };
